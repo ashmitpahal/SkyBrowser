@@ -1,63 +1,101 @@
-# SkyBrowser — controller-driven PC driver
+# SkyBrowser V2 — your controller is your mouse and keyboard
 
-## What this is
-`SkyBrowser.exe` turns a standard Xbox-style controller into a full PC
-mouse: it reads the gamepad through XInput and moves the **real Windows
-cursor**, so it works fullscreen in every browser, site, and app.
-Pure Rust standard library, no downloads, ~300 KB. Standalone — no
-browser, no window; it just runs quietly in the background.
+SkyBrowser turns a standard Xbox-style controller into a full PC mouse and
+keyboard. It reads the gamepad and moves the **real Windows cursor**, so it
+works fullscreen in every browser, site, video player, and app. No window,
+no setup — it just runs quietly in the background.
 
-## Controls
-```
-  CONTROLS (XBOX LAYOUT)
-  LT scroll up / LB back              RB forward / RT scroll down
- .--------------------------------------------------------------.
- |  LEFT STICK                   SELECT + START     Y           |
- |  fast cursor                  driver off / on X     B        |
- |                                                  A           |
- |  D-pad: not used               RIGHT STICK                   |
- |                                precise cursor                |
- '--------------------------------------------------------------'
+![Labelled controller diagram](controller-diagram.png)
 
-  A = left click   B = right click   X = hold to drag   Y = keyboard
-```
-- Left stick — fast cursor, Right stick — precise cursor
-- A — left click, B — right click
-- LT / RT — scroll up / down (hold to keep scrolling)
-- LB — back, RB — forward
-- X — hold to drag: keep X held and move a stick, release X to drop.
-  A is ignored while X is held so drags never drop early.
-- Y — on-screen keyboard on / off (toggle needs no setup; to *click*
-  its keys, run the Admin launcher — Windows ignores simulated
-  clicks on that secure window from non-admin apps)
-- **Select + Start — driver off / on** (it beeps: high = on, low = off).
-  Use it before launching a game so nothing collides.
+Prefer pictures? See the illustrated [user guide (PDF)](SkyBrowserV2-Guide.pdf).
+
+## Every control
+
+| Control | Action |
+|---|---|
+| Left stick | Fast mouse cursor |
+| Right stick | Precise mouse cursor |
+| A | Left click |
+| B | Right click |
+| X (hold) + move stick | Hold to drag, release X to drop |
+| Y | On-screen keyboard on / off |
+| LT / RT (hold) | Scroll up / down (hold to keep scrolling) |
+| LB / RB | Browser back / forward |
+| D-pad up / down | Volume up / down (hold to repeat) |
+| D-pad left / right | Arrow keys — tap skips video, hold keeps seeking |
+| Start + Y | Power menu (hold Start first, then press Y) |
+| Select + Start | Driver on / off (beeps: high = on, low = off) |
+
+## Details
+
+**Mouse.** Two sticks, two speeds — left is fast for crossing the screen,
+right is precise for small targets. Both can be used together, and a physical
+mouse never fights the driver.
+
+**Click and drag.** A = left click, B = right click. For drags, hold X and
+move a stick, then release X to drop. A is ignored mid-drag so you never
+drop things early, and the release always fires so drags never get stuck.
+
+**Scrolling.** Hold LT to scroll up, RT to scroll down. Holding keeps
+scrolling, one notch at a time.
+
+**Volume and video.** D-pad up / down turns the volume up / down (hold to
+keep changing it). D-pad left / right are the arrow keys: tap to skip a
+video backward / forward, hold to keep seeking.
+
+**Keyboard.** Y toggles the Windows on-screen keyboard. Toggling needs no
+setup, but *clicking* the keyboard's keys needs the Admin launcher, because
+Windows ignores simulated clicks on that secure window from normal apps.
+
+**Power menu.** Hold Start first, then press Y to open the Win+X quick menu
+(Shut down, Restart, Sleep, Settings, and more).
+
+**Driver on / off.** Press Select + Start together to pause the whole driver
+(for games) and again to resume. It beeps so you know: high = on, low = off.
 
 ## Limit it to chosen programs (optional)
-On first launch the exe creates
-`%LOCALAPPDATA%\SkyBrowser\whitelist.txt` (all lines commented = drive
-everywhere). Add exe names, one per line, e.g. `msedge.exe`, and the
-driver only injects input when one of those programs is in front.
-Delete the entries to go back to everywhere.
+
+On first launch the app creates
+`%LOCALAPPDATA%\SkyBrowser\whitelist.txt` (all lines commented = works
+everywhere). Add program names, one per line, e.g. `msedge.exe`, and the
+driver only works when one of those programs is in front. Delete the entries
+to go back to everywhere.
+
+## Running it
+
+- Double-click `SkyBrowser.exe`. There is no window — it stays quiet in the
+  background. Stop it in Task Manager when done.
+- Run only **one copy** at a time, or they fight over your controller.
+- Use `SkyBrowser Admin.bat` when you want clicks to reach the on-screen
+  keyboard (one permission prompt per launch).
+- Press Select + Start before launching a game so nothing collides.
 
 ## Files
-- `SkyBrowser.exe` — double-click to run (stays resident with no window;
-  end it in Task Manager when done).
-- `SkyBrowser Admin.bat` — same thing, elevated: use it when you want
-  clicks to reach the on-screen keyboard. One UAC prompt per launch.
-- `main.rs` — the whole driver source, unit tests included.
-- `build.bat` — gate: Rust tests, rebuild exe.
+
+| File | What it is |
+|---|---|
+| `SkyBrowser.exe` | The app (also attached to each Release) |
+| `SkyBrowser Admin.bat` | Elevated launcher for on-screen keyboard clicks |
+| `main.rs` | The whole driver source, tests included |
+| `build.bat` | Runs tests, rebuilds the exe |
+| `SkyBrowserV2-Guide.pdf` | Illustrated user guide |
+| `controller-diagram.png` | Labelled controller diagram |
+
+## Specs
+
+Single ~208 KB file, about 2.5 MB of RAM, pure Rust standard library with
+zero downloads.
 
 ## Rebuild
-Install Rust, then run `build.bat`.
+
+Install Rust, then run `build.bat` (runs the 14 unit tests, then builds).
 
 ## License
-MIT — free for anyone to use, see `LICENSE`.
+
+MIT — free for anyone to use, see `LICENSE`. Copyright 2026 ashmit pahal.
 
 ## Continuing this project in a new chat
-Chat history does not survive a reboot. To continue: open a new chat,
-point at this folder (`Desktop\SkyBrowser`), and say what to change.
-Useful commands: `muse resume --last` (reopens the previous chat).
-Built across Muse sessions starting with
-`01a17c57-1dbe-7de2-84cd-8f881f25b3e8` (the old browser start page was
-removed; the driver is standalone now).
+
+Chat history does not survive a reboot. To continue: open a new chat, point
+at this folder (`Desktop\SkyBrowserV2`), and say what to change. Useful
+command: `muse resume --last` (reopens the previous chat).

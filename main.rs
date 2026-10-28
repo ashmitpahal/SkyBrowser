@@ -5,6 +5,8 @@
 //        A            left click       B            right click
 //        LT / RT      scroll up/down   LB / RB      back / forward
 //        X            hold left button (drag)  Y     on-screen keyboard
+//        D-pad up/down volume                 D-pad left/right arrows
+//        Start+Y      power menu (Win+X)
 //
 // Tunables live in the SPEED / DEADZONE / TRIGGER_* constants below.
 // Pure mapping logic has unit tests at the bottom:
@@ -38,6 +40,10 @@ const BTN_X: u16 = 0x4000;
 const BTN_Y: u16 = 0x8000;
 const BTN_LB: u16 = 0x0100;
 const BTN_RB: u16 = 0x0200;
+const BTN_DPAD_UP: u16 = 0x0001;
+const BTN_DPAD_DOWN: u16 = 0x0002;
+const BTN_DPAD_LEFT: u16 = 0x0004;
+const BTN_DPAD_RIGHT: u16 = 0x0008;
 const BTN_START: u16 = 0x0010;
 const BTN_SELECT: u16 = 0x0020;
 
@@ -61,6 +67,11 @@ const KEYEVENTF_KEYUP: u32 = 0x0002;
 const VK_LWIN: u16 = 0x5B;
 const VK_CONTROL: u16 = 0x11;
 const VK_O: u16 = 0x4F;
+const VK_X: u16 = 0x58;
+const VK_LEFT: u16 = 0x25;
+const VK_RIGHT: u16 = 0x27;
+const VK_VOLUME_DOWN: u16 = 0xAE;
+const VK_VOLUME_UP: u16 = 0xAF;
 
 // ---------------------------------------------------------------- FFI
 #[repr(C)]
@@ -316,6 +327,22 @@ impl Toggle {
     }
 }
 
+/// Two-button combo edge detector (Start+Y power menu): fires once when
+/// both buttons are down together, re-arms after either is released.
+#[derive(Default)]
+struct Combo {
+    prev_both: bool,
+}
+
+impl Combo {
+    fn update(&mut self, a: bool, b: bool) -> bool {
+        let both = a && b;
+        let fire = both && !self.prev_both;
+        self.prev_both = both;
+        fire
+    }
+}
+
 /// Example allow-list written into the data dir on first launch.
 /// Every line is a comment, so the default is "drive everywhere" and the
 /// user restricts it by adding exe names.
@@ -478,6 +505,20 @@ fn toggle_osk() {
     }
 }
 
+/// Single momentary key press (down + up), e.g. one volume notch.
+fn tap_key(vk: u16) {
+    send_key(vk, false);
+    send_key(vk, true);
+}
+
+/// Open the Win+X Quick Link menu (Shut down, Restart, Settings...).
+fn power_menu() {
+    send_key(VK_LWIN, false);
+    send_key(VK_X, false);
+    send_key(VK_X, true);
+    send_key(VK_LWIN, true);
+}
+
 fn cursor_pos() -> Option<(f32, f32)> {
     let mut p = Point { x: 0, y: 0 };
     let ok = unsafe { GetCursorPos(&mut p) };
@@ -565,6 +606,11 @@ fn drive() {
     let mut wheel_down = WheelRepeat { last: None };
     let mut toggle = Toggle::on();
     let mut x_hold = HoldButton::default();
+    let mut power = Combo::default();
+    let mut vol_up = WheelRepeat { last: None };
+    let mut vol_down = WheelRepeat { last: None };
+    let mut arrow_l = HoldButton::default();
+    let mut arrow_r = HoldButton::default();
     let whitelist = load_whitelist(&ensure_data_dir());
     let mut scope = Scope::default();
     let mut last = Instant::now();
@@ -577,6 +623,12 @@ fn drive() {
             if x_hold.cancel() {
                 send_mouse(MOUSE_LEFT_UP, 0);
             }
+            if arrow_l.cancel() {
+                send_key(VK_LEFT, true);
+            }
+            if arrow_r.cancel() {
+                send_key(VK_RIGHT, true);
+            }
             std::thread::sleep(Duration::from_millis(250));
             last = Instant::now();
             continue;
@@ -585,17 +637,28 @@ fn drive() {
         // tracked every frame so toggling never fires a stale edge.
         let start = g.buttons & BTN_START != 0;
         let select = g.buttons & BTN_SELECT != 0;
-        if let Some(on) = toggle.update(start, select) {
+        let toggled = if let Some(on) = toggle.update(start, select) {
             edges.reset();
             if x_hold.cancel() {
                 send_mouse(MOUSE_LEFT_UP, 0);
+            }
+            if arrow_l.cancel() {
+                send_key(VK_LEFT, true);
+            }
+            if arrow_r.cancel() {
+                send_key(VK_RIGHT, true);
             }
             lt = Trigger::default();
             rt = Trigger::default();
             wheel_up = WheelRepeat { last: None };
             wheel_down = WheelRepeat { last: None };
+            vol_up = WheelRepeat { last: None };
+            vol_down = WheelRepeat { last: None };
             beep(on);
-        }
+            true
+        } else {
+            false
+        };
         let a = edges.hit(g.buttons, BTN_A);
         let b = edges.hit(g.buttons, BTN_B);
         let y = edges.hit(g.buttons, BTN_Y);
@@ -604,6 +667,16 @@ fn drive() {
         let fwd = edges.hit(g.buttons, BTN_RB);
         let up_edge = lt.update(g.left_trigger);
         let down_edge = rt.update(g.right_trigger);
+        let vol_up_edge = edges.hit(g.buttons, BTN_DPAD_UP);
+        let vol_down_edge = edges.hit(g.buttons, BTN_DPAD_DOWN);
+        let dpad_up = g.buttons & BTN_DPAD_UP != 0;
+        let dpad_down = g.buttons & BTN_DPAD_DOWN != 0;
+        let dpad_left = g.buttons & BTN_DPAD_LEFT != 0;
+        let dpad_right = g.buttons & BTN_DPAD_RIGHT != 0;
+        // Start+Y power menu. Tracked every frame so it never fires stale;
+        // suppressed on toggle frames so Select+Start+Y only toggles.
+        let y_now = g.buttons & BTN_Y != 0;
+        let power_edge = power.update(start, y_now) && !toggled;
         let live = toggle.enabled && scope.allows(&whitelist);
         // Sticks: left fast, right precise. Y is up on XInput, down on
         // screen, hence the negation.
@@ -639,8 +712,19 @@ fn drive() {
             if fwd {
                 x_button(XBUTTON_FORWARD);
             }
-            if y {
+            // Y is suppressed while Start is held: that means Start+Y power
+            // menu, not the keyboard. (Hold Start first, then press Y.)
+            if y && !start {
                 toggle_osk();
+            }
+            if power_edge {
+                power_menu();
+            }
+            if vol_up.poll(dpad_up, vol_up_edge, now) {
+                tap_key(VK_VOLUME_UP);
+            }
+            if vol_down.poll(dpad_down, vol_down_edge, now) {
+                tap_key(VK_VOLUME_DOWN);
             }
             if wheel_up.poll(lt.held(), up_edge, now) {
                 wheel(1);
@@ -657,6 +741,22 @@ fn drive() {
         }
         if x_release {
             send_mouse(MOUSE_LEFT_UP, 0);
+        }
+        // Arrow keys behave like held keyboard keys (video seek): engaging
+        // needs live, but the key-up must fire even if gated mid-hold.
+        let (l_press, l_release) = arrow_l.update(dpad_left, live);
+        if l_press {
+            send_key(VK_LEFT, false);
+        }
+        if l_release {
+            send_key(VK_LEFT, true);
+        }
+        let (r_press, r_release) = arrow_r.update(dpad_right, live);
+        if r_press {
+            send_key(VK_RIGHT, false);
+        }
+        if r_release {
+            send_key(VK_RIGHT, true);
         }
         std::thread::sleep(Duration::from_millis(8));
     }
@@ -799,6 +899,18 @@ mod tests {
         assert_eq!(t.update(false, true), None); // releasing
         assert_eq!(t.update(true, true), Some(true)); // combo: on again
         assert!(t.enabled);
+    }
+
+    #[test]
+    fn power_combo_fires_once_per_hold() {
+        let mut c = Combo::default();
+        assert!(!c.update(false, false));
+        assert!(!c.update(true, false)); // Start alone: nothing
+        assert!(!c.update(false, true)); // Y alone: nothing (Y keeps its own action)
+        assert!(c.update(true, true)); // Start+Y: fires
+        assert!(!c.update(true, true)); // held: silent
+        assert!(!c.update(true, false)); // Y released: quiet
+        assert!(c.update(true, true)); // pressed again: fires
     }
 
     #[test]
