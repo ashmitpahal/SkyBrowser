@@ -83,14 +83,10 @@ to go back to everywhere.
 
 ## Specs
 
-Single ~208 KB file, about 2.5 MB of RAM, pure Rust standard library with
+Single ~208 KB file, about 9.5 MB of RAM, pure Rust standard library with
 zero downloads.
 
-## Rebuild
 
-Install Rust, then run `build.bat` (runs the 14 unit tests, then builds).
-
-## License
 
 MIT — free for anyone to use, see `LICENSE`. Copyright 2026 ashmit pahal.
 
