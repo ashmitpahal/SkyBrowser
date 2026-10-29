@@ -89,9 +89,3 @@ zero downloads.
 
 
 MIT — free for anyone to use, see `LICENSE`. Copyright 2026 ashmit pahal.
-
-## Continuing this project in a new chat
-
-Chat history does not survive a reboot. To continue: open a new chat, point
-at this folder (`Desktop\SkyBrowserV2`), and say what to change. Useful
-command: `muse resume --last` (reopens the previous chat).
